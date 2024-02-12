@@ -1,4 +1,6 @@
-use redis_module::{redis_module, Context, RedisError, RedisResult, RedisString, RedisValue};
+use redis_module::{
+    redis_module, Context, NextArg, RedisError, RedisResult, RedisString, RedisValue,
+};
 use rquickjs::{Context as QJSContext, Ctx, IntoJs, Runtime, Type, Value as QJSValue};
 
 fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
@@ -17,11 +19,9 @@ fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
         None => return Err(RedisError::WrongArity),
     };
 
-    let numkeys = args.next().ok_or(RedisError::WrongArity).and_then(|v| {
-        v.to_string()
-            .parse::<usize>()
-            .map_err(|_| RedisError::Str("ERR invalid number of keys"))
-    })?;
+    let numkeys = args
+        .next_u64()
+        .map_err(|_| RedisError::Str("ERR invalid number of keys"))? as usize;
 
     let keys: Vec<String> = args.by_ref().take(numkeys).map(Into::into).collect();
     let argv: Vec<String> = args.map(Into::into).collect();
