@@ -1,5 +1,5 @@
 use redis_module::{redis_module, Context, RedisError, RedisResult, RedisString, RedisValue};
-use rquickjs::{Context as QJSContext, Ctx, Runtime, Type, Value as QJSValue};
+use rquickjs::{Context as QJSContext, Ctx, IntoJs, Runtime, Type, Value as QJSValue};
 
 fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     if args.len() < 3 {
@@ -28,13 +28,6 @@ fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
 
     let mut result: RedisResult = RedisResult::Ok(RedisValue::Null);
     ctx.with(|ctx| {
-        let stringify = |ctx: &Ctx, value| {
-            ctx.json_stringify(value)
-                .unwrap()
-                .unwrap()
-                .to_string()
-                .unwrap()
-        };
         let envelope = format!(
             r#"
             (function() {{
@@ -55,6 +48,14 @@ fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     });
 
     result
+}
+
+fn stringify<'js>(ctx: &Ctx<'js>, value: impl IntoJs<'js>) -> String {
+    ctx.json_stringify(value)
+        .unwrap()
+        .unwrap()
+        .to_string()
+        .unwrap()
 }
 
 struct Value<'a>(QJSValue<'a>);

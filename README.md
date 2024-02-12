@@ -14,10 +14,12 @@ $ redis-cli EVALJS "return 'Hello JS!'" 0
 $ redis-cli EVALJS "const fib = n => n <= 1 ? n : fib(n - 1) + fib(n - 2); return fib(10)" 0
 (integer) 55
 
-$ redis-cli EVALJS "return ['a', 'c', 'b'].sort((a, b) => a - b)" 0
-1) "a"
-2) "c"
-3) "b"
+$ redis-cli EVALJS "return [5, 4, 3, 2, 1].sort((a, b) => a - b)" 0
+1) (integer) 1
+2) (integer) 2
+3) (integer) 3
+4) (integer) 4
+5) (integer) 5
 
 $ redis-cli EVALJS "return [KEYS[0], KEYS[1], ARGV[0], ARGV[1], ARGV[2]]" 2 key1 key2 arg1 arg2 arg3
 1) "key1"
