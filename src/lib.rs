@@ -42,16 +42,19 @@ fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
         .get()
         .ok_or(RedisError::Str("ERR QJS context not initialized"))?;
     ctx.with(|ctx| {
+        let globals = ctx.globals();
+        globals
+            .set("KEYS", keys.clone())
+            .expect("failed to set KEYS");
+        globals
+            .set("ARGV", argv.clone())
+            .expect("failed to set ARGV");
         let envelope = format!(
             r#"
-            (function() {{
-                const KEYS = {};
-                const ARGV = {};
-                {}
-            }})();
-        "#,
-            stringify(&ctx, keys),
-            stringify(&ctx, argv),
+                (function() {{
+                    {}
+                }})();
+            "#,
             code
         );
 

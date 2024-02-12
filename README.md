@@ -9,10 +9,10 @@ Unfortunately it is not as fast as EVAL, but it is still quite fast:
 ```bash
 $ redis-benchmark EVALJS "return 'Hello!'" 0
 Summary:
-  throughput summary: 83963.05 requests per second
+  throughput summary: 115473.45 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.561     0.136     0.591     0.711     0.767     1.687
+        0.403     0.096     0.415     0.535     0.623     1.215
 
 $ redis-benchmark EVAL "return 'Hello!'" 0
 Summary:
