@@ -36,6 +36,15 @@ impl From<Value<'_>> for RedisValue {
             Type::Float => RedisValue::Float(v.as_float().unwrap()),
             Type::String => RedisValue::BulkString(unsafe { v.ref_string() }.to_string().unwrap()),
             Type::Null | Type::Undefined | Type::Unknown => RedisValue::Null,
+            Type::Array => {
+                let arr = v
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| Value(v.unwrap()).into())
+                    .collect();
+                RedisValue::Array(arr)
+            }
             _ => RedisValue::StaticError("unsupported type"),
             // Symbol | Object | Array | Function | Constructor => {
             //     write!(f, "(")?;

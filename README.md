@@ -10,6 +10,14 @@ $ redis-cli EVALJS "return 1 + 2" 0
 
 $ redis-cli EVALJS "return 'Hello JS!'" 0
 "Hello JS!"
+
+$ redis-cli EVALJS "const fib = n => n <= 1 ? n : fib(n - 1) + fib(n - 2); return fib(10)" 0
+(integer) 55
+
+$ redis-cli EVALJS "return ['a', 'c', 'b'].sort((a, b) => a - b)" 0
+1) "a"
+2) "c"
+3) "b"
 ```
 
 ## Installation
