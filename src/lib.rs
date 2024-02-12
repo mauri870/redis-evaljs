@@ -35,7 +35,7 @@ impl From<Value<'_>> for RedisValue {
             Type::Int => RedisValue::Integer(v.as_int().unwrap() as i64),
             Type::Float => RedisValue::Float(v.as_float().unwrap()),
             Type::String => RedisValue::BulkString(unsafe { v.ref_string() }.to_string().unwrap()),
-            Type::Null | Type::Undefined | Type::Unknown => RedisValue::Null,
+            Type::Null | Type::Uninitialized | Type::Undefined | Type::Unknown => RedisValue::Null,
             Type::Array => {
                 let arr = v
                     .as_array()
@@ -46,19 +46,6 @@ impl From<Value<'_>> for RedisValue {
                 RedisValue::Array(arr)
             }
             _ => RedisValue::StaticError("unsupported type"),
-            // Symbol | Object | Array | Function | Constructor => {
-            //     write!(f, "(")?;
-            //     unsafe { self.get_ptr() }.fmt(f)?;
-            //     write!(f, ")")?;
-            // }
-            // Exception => {
-            //     writeln!(f, "(")?;
-            //     self.as_exception().unwrap().fmt(f)?;
-            //     writeln!(f, ")")?;
-            // }
-            // Uninitialized => "uninitialized".fmt(f)?,
-            // Module => "module".fmt(f)?,
-            // BigInt => "BigInt".fmt(f)?,
         }
     }
 }
