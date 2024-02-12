@@ -1,5 +1,5 @@
 use redis_module::{redis_module, Context, RedisError, RedisResult, RedisString, RedisValue};
-use rquickjs::{Context as QJSContext, Runtime, Type, Value as QJSValue};
+use rquickjs::{Context as QJSContext, Ctx, Runtime, Type, Value as QJSValue};
 
 fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     if args.len() < 3 {
@@ -12,10 +12,42 @@ fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
 
     let mut args = args.into_iter().skip(1);
 
-    let code = args.next().unwrap().clone();
-    let envelope = format!("(function() {{ {} }})()", code);
+    let code = match args.next() {
+        Some(v) => v.to_string(),
+        None => return Err(RedisError::WrongArity),
+    };
+
+    let numkeys = args.next().ok_or(RedisError::WrongArity).and_then(|v| {
+        v.to_string()
+            .parse::<usize>()
+            .map_err(|_| RedisError::Str("ERR invalid number of keys"))
+    })?;
+
+    let keys: Vec<String> = args.by_ref().take(numkeys).map(Into::into).collect();
+    let argv: Vec<String> = args.map(Into::into).collect();
+
     let mut result: RedisResult = RedisResult::Ok(RedisValue::Null);
     ctx.with(|ctx| {
+        let stringify = |ctx: &Ctx, value| {
+            ctx.json_stringify(value)
+                .unwrap()
+                .unwrap()
+                .to_string()
+                .unwrap()
+        };
+        let envelope = format!(
+            r#"
+            (function() {{
+                const KEYS = {};
+                const ARGV = {};
+                {}
+            }})();
+        "#,
+            stringify(&ctx, keys),
+            stringify(&ctx, argv),
+            code
+        );
+
         result = match ctx.eval(envelope) {
             Ok(v) => RedisResult::Ok(Value(v).into()),
             Err(e) => RedisResult::Err(RedisError::String(e.to_string())),
