@@ -1,16 +1,26 @@
-use redis_module::{
-    redis_module, Context, NextArg, RedisError, RedisResult, RedisString, RedisValue,
-};
-use rquickjs::{Context as QJSContext, Ctx, IntoJs, Runtime, Type, Value as QJSValue};
+#[macro_use]
+extern crate redis_module;
 
+use redis_module::{Context, NextArg, RedisError, RedisResult, RedisString, RedisValue, Status};
+use rquickjs::{Context as QJSContext, Ctx, IntoJs, Runtime, Type, Value as QJSValue};
+use std::sync::OnceLock;
+
+static QJSCONTEXT: OnceLock<QJSContext> = OnceLock::new();
+
+fn init(_ctx: &Context, _args: &[RedisString]) -> Status {
+    QJSCONTEXT.get_or_init(|| {
+        let rt = Runtime::new().unwrap();
+        rt.set_max_stack_size(256 * 1024);
+        let ctx = QJSContext::full(&rt).unwrap();
+        ctx
+    });
+
+    Status::Ok
+}
 fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     if args.len() < 3 {
         return Err(RedisError::WrongArity);
     }
-
-    let rt = Runtime::new()?;
-    rt.set_max_stack_size(64 * 1024);
-    let ctx = QJSContext::full(&rt)?;
 
     let mut args = args.into_iter().skip(1);
 
@@ -27,6 +37,10 @@ fn evaljs_cmd(_ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     let argv: Vec<String> = args.map(Into::into).collect();
 
     let mut result: RedisResult = RedisResult::Ok(RedisValue::Null);
+
+    let ctx = QJSCONTEXT
+        .get()
+        .ok_or(RedisError::Str("ERR QJS context not initialized"))?;
     ctx.with(|ctx| {
         let envelope = format!(
             r#"
@@ -90,6 +104,7 @@ redis_module! {
     version: 1,
     allocator: (redis_module::alloc::RedisAlloc, redis_module::alloc::RedisAlloc),
     data_types: [],
+    init: init,
     commands: [
         ["EVALJS", evaljs_cmd, "", 0, 0, 0],
     ],

@@ -2,7 +2,27 @@
 
 This module provides a way to evaluate JavaScript code inside of Redis. It uses the awesome QuickJS engine by Fabrice Bellard.
 
-It is similar to [EVAL](https://redis.io/commands/eval), but EVALJS is very basic and slow in its current state. There is no support for executing Redis commands, think about it as a JS interpreter inside Redis.
+It is similar in functionality to [EVAL](https://redis.io/commands/eval). Currently there is no support for executing Redis commands, think of it as a JS interpreter inside Redis.
+
+Unfortunately it is not as fast as EVAL, but it is still quite fast:
+
+```bash
+$ redis-benchmark EVALJS "return 'Hello!'" 0
+Summary:
+  throughput summary: 83963.05 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        0.561     0.136     0.591     0.711     0.767     1.687
+
+$ redis-benchmark EVAL "return 'Hello!'" 0
+Summary:
+  throughput summary: 239234.44 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        0.118     0.032     0.119     0.151     0.223     0.831
+```
+
+Here are some examples:
 
 ```bash
 $ redis-cli EVALJS "return 1 + 2" 0
