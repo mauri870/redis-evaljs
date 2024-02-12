@@ -65,3 +65,11 @@ redis-server --loadmodule ./target/release/libredisjs.so
 # or
 redis-cli MODULE LOAD ./target/release/libredisjs.so
 ```
+
+## Testing
+
+After starting a Redis server with the module loaded, you can run the tests with [bats](https://github.com/bats-core/bats-core):
+
+```sh
+bats tests
+```
