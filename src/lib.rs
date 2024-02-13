@@ -4,13 +4,12 @@
 extern crate redis_module;
 
 use redis_module::{
-    logging::RedisLogLevel, CallOptionsBuilder, Context, NextArg, PromiseCallReply, RedisError,
-    RedisResult, RedisString, RedisValue, Status, ThreadSafeContext,
+    Context, NextArg, RedisError, RedisResult, RedisString, RedisValue, Status, ThreadSafeContext,
 };
 use rquickjs::{
     prelude::{Func, Rest},
-    Context as QJSContext, Ctx, Error as QJSError, FromJs, IntoJs, Object, Result as QJSResult,
-    Runtime, Type, Value as QJSValue,
+    Context as QJSContext, Ctx, Error as QJSError, Object, Result as QJSResult, Runtime, Type,
+    Value as QJSValue,
 };
 use std::{sync::OnceLock, thread};
 
@@ -46,16 +45,19 @@ pub fn js_module_redis<'js>(ctx: &Ctx<'js>) -> QJSResult<()> {
     redis.set(
         "call",
         Func::from(
-            move |ctx: Ctx<'js>, args: Rest<QJSValue<'js>>| -> QJSResult<String> {
-                // TODO: handle variables
-                let a: Vec<String> = args.into_iter().map(|v| stringify(&ctx, v)).collect();
-                let aa: String = a.join("");
+            move |ctx: Ctx<'js>, args: Rest<QJSValue<'js>>| -> QJSResult<QJSValue> {
+                let strargs = args
+                    .iter()
+                    .map(|v| unsafe { v.ref_string() }.to_string().unwrap())
+                    .collect::<Vec<_>>();
                 let rctx = redis_module::MODULE_CONTEXT.lock();
-                rctx.log(RedisLogLevel::Warning, aa.as_str());
+                let cmdargs: Vec<&String> = strargs.iter().collect();
+                // rctx.log(RedisLogLevel::Warning, "hello");
                 // TODO: not sure why this does not work. It might accept only static strings.
-                rctx.call("SET", aa.as_str())
-                    .expect("failed to run redis call");
-                Ok(String::from("call"))
+                let res = rctx.call(cmdargs[0], &cmdargs[1..]);
+                rctx.reply(res);
+
+                Ok(QJSValue::new_null(ctx))
             },
         ),
     )?;
@@ -149,14 +151,6 @@ fn evaljs_cmd(redisctx: &Context, args: Vec<RedisString>) -> RedisResult {
     // });
 
     // result
-}
-
-fn stringify<'js>(ctx: &Ctx<'js>, value: impl IntoJs<'js>) -> String {
-    ctx.json_stringify(value)
-        .expect("failed to stringify")
-        .unwrap()
-        .to_string()
-        .expect("failed to convert to string")
 }
 
 struct Value<'a>(QJSValue<'a>);
