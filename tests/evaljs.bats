@@ -76,3 +76,13 @@ EOF
     [ "$status" -eq 0 ]
     [ "$output" = "$want" ]
 }
+
+@test "redis.call" {
+    run redis-cli EVALJS "return redis.call('SET', 'a', 42)" 0
+    [ "$status" -eq 0 ]
+    [ "$output" = "" ]
+
+    run redis-cli GET a
+    [ "$status" -eq 0 ]
+    [ "$output" = "42" ]
+}
