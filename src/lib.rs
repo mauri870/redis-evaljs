@@ -1,5 +1,8 @@
 #![feature(once_cell_try)]
 
+mod redisjs;
+mod vm;
+
 #[macro_use]
 extern crate redis_module;
 
@@ -13,60 +16,50 @@ use rquickjs::{
 };
 use std::{sync::OnceLock, thread};
 
-static QJSCONTEXT: OnceLock<QJSContext> = OnceLock::new();
+static VM: OnceLock<vm::VM> = OnceLock::new();
 
-fn init(redisctx: &Context, _args: &[RedisString]) -> Status {
-    let result = QJSCONTEXT.get_or_try_init(|| {
-        let rt = Runtime::new()?;
-        rt.set_max_stack_size(256 * 1024);
-        let ctx = QJSContext::full(&rt)?;
-        ctx.with(|ctx| {
-            js_module_redis(&ctx)?;
-            Ok::<_, QJSError>(())
-        })?;
-
-        QJSResult::Ok(ctx)
-    });
+fn init(ctx: &Context, _args: &[RedisString]) -> Status {
+    let result = VM.get_or_try_init(|| vm::VM::new());
 
     match result {
         Ok(_) => Status::Ok,
         Err(e) => {
-            redisctx.log_warning(&format!("QJS context init failed: {}", e));
-            return Status::Err;
+            ctx.log_warning(&format!("VM initialization failed: {}", e));
+            Status::Err
         }
     }
 }
 
-pub fn js_module_redis<'js>(ctx: &Ctx<'js>) -> QJSResult<()> {
-    let globals = ctx.globals();
-    let redis = Object::new(ctx.clone())?;
+// pub fn js_module_redis<'js>(ctx: &Ctx<'js>) -> QJSResult<()> {
+//     let globals = ctx.globals();
+//     let redis = Object::new(ctx.clone())?;
 
-    // redis.set("call", Func::from(call))?;
-    redis.set(
-        "call",
-        Func::from(
-            move |ctx: Ctx<'js>, args: Rest<QJSValue<'js>>| -> QJSResult<QJSValue> {
-                let strargs = args
-                    .iter()
-                    .map(|v| unsafe { v.ref_string() }.to_string().unwrap())
-                    .collect::<Vec<_>>();
-                let rctx = redis_module::MODULE_CONTEXT.lock();
-                let cmdargs: Vec<&String> = strargs.iter().collect();
-                // rctx.log(RedisLogLevel::Warning, "hello");
-                // TODO: not sure why this does not work. It might accept only static strings.
-                let res = rctx.call(cmdargs[0], &cmdargs[1..]);
-                rctx.reply(res);
+//     // redis.set("call", Func::from(call))?;
+//     redis.set(
+//         "call",
+//         Func::from(
+//             move |ctx: Ctx<'js>, args: Rest<QJSValue<'js>>| -> QJSResult<QJSValue> {
+//                 let strargs = args
+//                     .iter()
+//                     .map(|v| unsafe { v.ref_string() }.to_string().unwrap())
+//                     .collect::<Vec<_>>();
+//                 let rctx = redis_module::MODULE_CONTEXT.lock();
+//                 let cmdargs: Vec<&String> = strargs.iter().collect();
+//                 // rctx.log(RedisLogLevel::Warning, "hello");
+//                 // TODO: not sure why this does not work. It might accept only static strings.
+//                 let res = rctx.call(cmdargs[0], &cmdargs[1..]);
+//                 rctx.reply(res);
 
-                Ok(QJSValue::new_null(ctx))
-            },
-        ),
-    )?;
-    globals.set("redis", redis)?;
+//                 Ok(QJSValue::new_null(ctx))
+//             },
+//         ),
+//     )?;
+//     globals.set("redis", redis)?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-fn evaljs_cmd(redisctx: &Context, args: Vec<RedisString>) -> RedisResult {
+fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     if args.len() < 3 {
         return Err(RedisError::WrongArity);
     }
@@ -85,21 +78,21 @@ fn evaljs_cmd(redisctx: &Context, args: Vec<RedisString>) -> RedisResult {
     let keys: Vec<String> = args.by_ref().take(numkeys).map(Into::into).collect();
     let argv: Vec<String> = args.map(Into::into).collect();
 
-    let blocked_client = redisctx.block_client();
+    let blocked_client = ctx.block_client();
     thread::spawn(move || {
         let thread_ctx = ThreadSafeContext::with_blocked_client(blocked_client);
-        let ctx = match QJSCONTEXT
+        let vm = match VM
             .get()
             .ok_or(RedisError::Str("ERR QJS context not initialized"))
         {
-            Ok(ctx) => ctx,
+            Ok(vm) => vm,
             Err(e) => {
                 thread_ctx.reply(RedisResult::Err(e));
                 return;
             }
         };
 
-        ctx.with(|ctx| {
+        vm.eval(|ctx| {
             let globals = ctx.globals();
             globals
                 .set("KEYS", keys.clone())
@@ -107,7 +100,7 @@ fn evaljs_cmd(redisctx: &Context, args: Vec<RedisString>) -> RedisResult {
             globals
                 .set("ARGV", argv.clone())
                 .expect("failed to set ARGV");
-            let envelope = format!(
+            let wrapper = format!(
                 r#"
                 (function() {{
                     {}
@@ -116,7 +109,7 @@ fn evaljs_cmd(redisctx: &Context, args: Vec<RedisString>) -> RedisResult {
                 code
             );
 
-            let result = match ctx.eval(envelope) {
+            let result = match ctx.eval(wrapper) {
                 Ok(v) => RedisResult::Ok(Value(v).into()),
                 Err(e) => RedisResult::Err(RedisError::String(e.to_string())),
             };
