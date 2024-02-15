@@ -1,4 +1,4 @@
-use rquickjs::{Context, Ctx, Result, Runtime, Value};
+use rquickjs::{Context, Ctx, Runtime};
 
 use std::result::Result as StdResult;
 

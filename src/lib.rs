@@ -9,11 +9,7 @@ extern crate redis_module;
 use redis_module::{
     Context, NextArg, RedisError, RedisResult, RedisString, RedisValue, Status, ThreadSafeContext,
 };
-use rquickjs::{
-    prelude::{Func, Rest},
-    Context as QJSContext, Ctx, Error as QJSError, Object, Result as QJSResult, Runtime, Type,
-    Value as QJSValue,
-};
+use rquickjs::{Type, Value as QJSValue};
 use std::{sync::OnceLock, thread};
 
 static VM: OnceLock<vm::VM> = OnceLock::new();
@@ -88,33 +84,6 @@ fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
         });
     });
     Ok(RedisValue::NoReply)
-
-    // let mut result: RedisResult = RedisResult::Ok(RedisValue::Null);
-
-    // let ctx = QJSCONTEXT
-    //     .get()
-    //     .ok_or(RedisError::Str("ERR QJS context not initialized"))?;
-    // ctx.with(|ctx| {
-    //     let envelope = format!(
-    //         r#"
-    //         (function() {{
-    //             const KEYS = {};
-    //             const ARGV = {};
-    //             {}
-    //         }})();
-    //     "#,
-    //         stringify(&ctx, keys),
-    //         stringify(&ctx, argv),
-    //         code
-    //     );
-
-    //     result = match ctx.eval(envelope) {
-    //         Ok(v) => RedisResult::Ok(Value(v).into()),
-    //         Err(e) => RedisResult::Err(RedisError::String(e.to_string())),
-    //     };
-    // });
-
-    // result
 }
 
 struct Value<'a>(QJSValue<'a>);
