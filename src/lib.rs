@@ -30,35 +30,6 @@ fn init(ctx: &Context, _args: &[RedisString]) -> Status {
     }
 }
 
-// pub fn js_module_redis<'js>(ctx: &Ctx<'js>) -> QJSResult<()> {
-//     let globals = ctx.globals();
-//     let redis = Object::new(ctx.clone())?;
-
-//     // redis.set("call", Func::from(call))?;
-//     redis.set(
-//         "call",
-//         Func::from(
-//             move |ctx: Ctx<'js>, args: Rest<QJSValue<'js>>| -> QJSResult<QJSValue> {
-//                 let strargs = args
-//                     .iter()
-//                     .map(|v| unsafe { v.ref_string() }.to_string().unwrap())
-//                     .collect::<Vec<_>>();
-//                 let rctx = redis_module::MODULE_CONTEXT.lock();
-//                 let cmdargs: Vec<&String> = strargs.iter().collect();
-//                 // rctx.log(RedisLogLevel::Warning, "hello");
-//                 // TODO: not sure why this does not work. It might accept only static strings.
-//                 let res = rctx.call(cmdargs[0], &cmdargs[1..]);
-//                 rctx.reply(res);
-
-//                 Ok(QJSValue::new_null(ctx))
-//             },
-//         ),
-//     )?;
-//     globals.set("redis", redis)?;
-
-//     Ok(())
-// }
-
 fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     if args.len() < 3 {
         return Err(RedisError::WrongArity);
