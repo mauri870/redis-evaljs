@@ -3,7 +3,7 @@ use rquickjs::{Context, Ctx, Runtime};
 use std::result::Result as StdResult;
 
 pub struct VM {
-    runtime: Runtime,
+    _runtime: Runtime,
     ctx: Context,
 }
 
@@ -18,7 +18,10 @@ impl VM {
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         })?;
 
-        Ok(Self { runtime, ctx })
+        Ok(Self {
+            _runtime: runtime,
+            ctx,
+        })
     }
 
     pub fn eval<F, R>(&self, f: F) -> R

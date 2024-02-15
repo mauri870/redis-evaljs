@@ -1,6 +1,6 @@
 use rquickjs::{
     prelude::{Func, Rest},
-    Ctx, Object, Result, Value,
+    Ctx, IntoJs, Object, Result, Value,
 };
 
 pub fn init(ctx: &Ctx<'_>) -> Result<()> {
@@ -20,10 +20,15 @@ fn call<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> Result<Value<'js>> {
         .iter()
         .map(|v| unsafe { v.ref_string() }.to_string().unwrap())
         .collect::<Vec<_>>();
-    let rctx = redis_module::MODULE_CONTEXT.lock();
     let cmdargs: Vec<&String> = strargs.iter().collect();
-    let res = rctx.call(cmdargs[0], &cmdargs[1..]);
-    rctx.reply(res);
 
-    Ok(Value::new_null(ctx))
+    let rctx = redis_module::MODULE_CONTEXT.lock();
+    let res = rctx
+        .call(cmdargs[0], &cmdargs[1..])
+        .expect("failed to call redis");
+
+    match res {
+        redis_module::RedisValue::SimpleString(s) => s.into_js(&ctx),
+        _ => Ok(Value::new_null(ctx)),
+    }
 }
