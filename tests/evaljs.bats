@@ -80,9 +80,9 @@ EOF
 @test "redis.call" {
     run redis-cli EVALJS "return redis.call('SET', 'a', 42)" 0
     [ "$status" -eq 0 ]
-    [ "$output" = "" ]
+    [ "$output" = "OK" ]
 
-    run redis-cli GET a
+    run redis-cli EVALJS "return redis.call('GET', 'a')" 0
     [ "$status" -eq 0 ]
     [ "$output" = "42" ]
 }
