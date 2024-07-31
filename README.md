@@ -47,6 +47,12 @@ $ redis-cli EVALJS "return [KEYS[0], KEYS[1], ARGV[0], ARGV[1], ARGV[2]]" 2 key1
 3) "arg1"
 4) "arg2"
 5) "arg3"
+
+$ redis-cli EVALJS "return redis.call('SET', 'a', 42)" 0
+"OK"
+
+$ redis-cli EVALJS "return redis.call('GET', 'a')" 0
+"42"
 ```
 
 ## Installation
