@@ -1,5 +1,3 @@
-#![feature(once_cell_try)]
-
 mod redisjs;
 mod vm;
 
@@ -14,16 +12,10 @@ use std::{sync::OnceLock, thread};
 
 static VM: OnceLock<vm::VM> = OnceLock::new();
 
-fn init(ctx: &Context, _args: &[RedisString]) -> Status {
-    let result = VM.get_or_try_init(|| vm::VM::new());
-
-    match result {
-        Ok(_) => Status::Ok,
-        Err(e) => {
-            ctx.log_warning(&format!("VM initialization failed: {}", e));
-            Status::Err
-        }
-    }
+fn init(_ctx: &Context, _args: &[RedisString]) -> Status {
+    // TODO: use get_or_try_init once it's stabilized.
+    VM.get_or_init(|| vm::VM::new().expect("failed to initialize QJS VM"));
+    Status::Ok
 }
 
 fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
