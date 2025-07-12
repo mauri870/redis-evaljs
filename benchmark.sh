@@ -2,6 +2,9 @@
 
 set -e
 
+# Generate a random port between 16379 and 26379
+REDIS_PORT=$((16379 + RANDOM % 10000))
+
 cleanup() {
     echo "Cleaning up..."
     if [[ -n $REDIS_PID ]]; then
@@ -18,8 +21,8 @@ cargo build --release >/dev/null 2>&1
 
 pkill redis-server 2>/dev/null || true
 
-echo "Starting Redis server..."
-redis-server --loadmodule ./target/release/libredisjs.so >/dev/null 2>&1 &
+echo "Starting Redis server on port $REDIS_PORT..."
+redis-server --port $REDIS_PORT --loadmodule ./target/release/libredisjs.so >/dev/null 2>&1 &
 REDIS_PID=$!
 
 sleep 1
@@ -32,10 +35,10 @@ fi
 echo "Running benchmarks..."
 
 echo "=== Simple Math Test ==="
-EVALJS_OUTPUT=$(redis-benchmark EVALJS "return 1 + 2" 0 2>/dev/null)
+EVALJS_OUTPUT=$(redis-benchmark -p $REDIS_PORT EVALJS "return 1 + 2" 0 2>/dev/null)
 EVALJS_SUMMARY=$(echo "$EVALJS_OUTPUT" | tail -5)
 
-EVAL_OUTPUT=$(redis-benchmark EVAL "return 1 + 2" 0 2>/dev/null)
+EVAL_OUTPUT=$(redis-benchmark -p $REDIS_PORT EVAL "return 1 + 2" 0 2>/dev/null)
 EVAL_SUMMARY=$(echo "$EVAL_OUTPUT" | tail -5)
 
 echo
@@ -56,10 +59,10 @@ fi
 
 echo
 echo "=== Redis Call Test ==="
-EVALJS_CALL_OUTPUT=$(redis-benchmark EVALJS "return redis.call('SET', 'a', 42)" 0 2>/dev/null)
+EVALJS_CALL_OUTPUT=$(redis-benchmark -p $REDIS_PORT EVALJS "return redis.call('SET', 'a', 42)" 0 2>/dev/null)
 EVALJS_CALL_SUMMARY=$(echo "$EVALJS_CALL_OUTPUT" | tail -5)
 
-EVAL_CALL_OUTPUT=$(redis-benchmark EVAL "return redis.call('SET', 'a', 42)" 0 2>/dev/null)
+EVAL_CALL_OUTPUT=$(redis-benchmark -p $REDIS_PORT EVAL "return redis.call('SET', 'a', 42)" 0 2>/dev/null)
 EVAL_CALL_SUMMARY=$(echo "$EVAL_CALL_OUTPUT" | tail -5)
 
 echo
