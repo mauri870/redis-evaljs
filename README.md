@@ -7,19 +7,19 @@ It is similar in functionality to [EVAL](https://redis.io/commands/eval). Curren
 Unfortunately it is not as fast as EVAL, but it is still quite fast:
 
 ```bash
-$ redis-benchmark EVALJS "return 'Hello!'" 0
+$ redis-benchmark EVALJS "return 1 + 2" 0
 Summary:
-  throughput summary: 115473.45 requests per second
+  throughput summary: 44169.61 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.403     0.096     0.415     0.535     0.623     1.215
+        0.919     0.240     0.871     1.423     1.671     2.367
 
-$ redis-benchmark EVAL "return 'Hello!'" 0
+$ redis-benchmark EVAL "return 1 + 2" 0
 Summary:
-  throughput summary: 239234.44 requests per second
+  throughput summary: 58105.75 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.118     0.032     0.119     0.151     0.223     0.831
+        0.654     0.240     0.591     1.127     1.343     2.023
 ```
 
 Here are some examples:
