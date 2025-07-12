@@ -8,13 +8,53 @@ use redis_module::{
     Context, NextArg, RedisError, RedisResult, RedisString, RedisValue, Status, ThreadSafeContext,
 };
 use rquickjs::{Type, Value as QJSValue};
-use std::{sync::OnceLock, thread};
+use std::{
+    sync::{mpsc, Arc, Mutex, OnceLock},
+    thread,
+};
 
 static VM: OnceLock<vm::VM> = OnceLock::new();
+static THREAD_POOL: OnceLock<ThreadPool> = OnceLock::new();
+
+struct ThreadPool {
+    sender: mpsc::Sender<Job>,
+}
+
+type Job = Box<dyn FnOnce() + Send + 'static>;
+
+impl ThreadPool {
+    fn new(size: usize) -> ThreadPool {
+        let (sender, receiver) = mpsc::channel::<Job>();
+        let receiver = Arc::new(Mutex::new(receiver));
+
+        for _ in 0..size {
+            let receiver = Arc::clone(&receiver);
+            thread::spawn(move || loop {
+                match receiver.lock().unwrap().recv() {
+                    Ok(job) => job(),
+                    Err(_) => break,
+                }
+            });
+        }
+
+        ThreadPool { sender }
+    }
+
+    fn execute<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let job = Box::new(f);
+        self.sender.send(job).unwrap();
+    }
+}
 
 fn init(_ctx: &Context, _args: &[RedisString]) -> Status {
     // TODO: use get_or_try_init once it's stabilized.
     VM.get_or_init(|| vm::VM::new().expect("failed to initialize QJS VM"));
+
+    THREAD_POOL.get_or_init(|| ThreadPool::new(num_cpus::get()));
+
     Status::Ok
 }
 
@@ -38,7 +78,9 @@ fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     let argv: Vec<String> = args.map(Into::into).collect();
 
     let blocked_client = ctx.block_client();
-    thread::spawn(move || {
+
+    let pool = THREAD_POOL.get().expect("Thread pool not initialized");
+    pool.execute(move || {
         let thread_ctx = ThreadSafeContext::with_blocked_client(blocked_client);
         let vm = match VM
             .get()
