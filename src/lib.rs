@@ -9,12 +9,17 @@ use redis_module::{
 };
 use rquickjs::{Type, Value as QJSValue};
 use std::{
+    cell::RefCell,
     sync::{mpsc, Arc, Mutex, OnceLock},
     thread,
 };
 
-static VM: OnceLock<vm::VM> = OnceLock::new();
 static THREAD_POOL: OnceLock<ThreadPool> = OnceLock::new();
+
+// VM is thread-local to avoid contention
+thread_local! {
+    static VM: RefCell<Option<vm::VM>> = RefCell::new(None);
+}
 
 struct ThreadPool {
     sender: mpsc::Sender<Job>,
@@ -50,9 +55,7 @@ impl ThreadPool {
 }
 
 fn init(_ctx: &Context, _args: &[RedisString]) -> Status {
-    // TODO: use get_or_try_init once it's stabilized.
-    VM.get_or_init(|| vm::VM::new().expect("failed to initialize QJS VM"));
-
+    // Initialize thread pool
     THREAD_POOL.get_or_init(|| ThreadPool::new(num_cpus::get()));
 
     Status::Ok
@@ -82,40 +85,31 @@ fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
     let pool = THREAD_POOL.get().expect("Thread pool not initialized");
     pool.execute(move || {
         let thread_ctx = ThreadSafeContext::with_blocked_client(blocked_client);
-        let vm = match VM
-            .get()
-            .ok_or(RedisError::Str("ERR QJS context not initialized"))
-        {
-            Ok(vm) => vm,
-            Err(e) => {
-                thread_ctx.reply(RedisResult::Err(e));
-                return;
+
+        // Get or create thread-local VM
+        let vm_result = VM.with(|vm_cell| {
+            let mut vm_opt = vm_cell.borrow_mut();
+            if vm_opt.is_none() {
+                *vm_opt = Some(vm::VM::new().expect("failed to initialize QJS VM"));
             }
-        };
+            vm_opt.as_ref().unwrap().eval(|ctx| {
+                let globals = ctx.globals();
+                globals.set("KEYS", &keys).expect("failed to set KEYS");
+                globals.set("ARGV", &argv).expect("failed to set ARGV");
 
-        vm.eval(|ctx| {
-            let globals = ctx.globals();
-            globals
-                .set("KEYS", keys.clone())
-                .expect("failed to set KEYS");
-            globals
-                .set("ARGV", argv.clone())
-                .expect("failed to set ARGV");
-            let wrapper = format!(
-                r#"
-                (function() {{
-                    {}
-                }})();
-            "#,
-                code
-            );
+                let mut wrapper = String::with_capacity(code.len() + 30);
+                wrapper.push_str("(function(){");
+                wrapper.push_str(&code);
+                wrapper.push_str("})();");
 
-            let result = match ctx.eval(wrapper) {
-                Ok(v) => RedisResult::Ok(Value(v).into()),
-                Err(e) => RedisResult::Err(RedisError::String(e.to_string())),
-            };
-            thread_ctx.reply(result)
+                match ctx.eval(wrapper) {
+                    Ok(v) => RedisResult::Ok(Value(v).into()),
+                    Err(e) => RedisResult::Err(RedisError::String(e.to_string())),
+                }
+            })
         });
+
+        thread_ctx.reply(vm_result);
     });
     Ok(RedisValue::NoReply)
 }

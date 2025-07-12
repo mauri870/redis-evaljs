@@ -11,3 +11,4 @@ name = "redisjs"
 num_cpus = "1.17.0"
 rquickjs = { version = "0.9.0", features = ["parallel"] }
 redis-module = "2.0.7"
+once_cell = "1.19"
