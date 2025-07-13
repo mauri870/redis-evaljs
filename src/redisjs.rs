@@ -1,3 +1,4 @@
+use redis_module::RedisValue;
 use rquickjs::{
     prelude::{Func, Rest},
     Ctx, IntoJs, Object, Result, Value,
@@ -24,10 +25,11 @@ fn call<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> Result<Value<'js>> {
     // Create string slice references more efficiently
     let cmdargs: Vec<&str> = strargs.iter().map(|s| s.as_str()).collect();
 
-    let rctx = redis_module::MODULE_CONTEXT.lock();
-    let res = rctx
-        .call(cmdargs[0], &cmdargs[1..])
-        .expect("failed to call redis");
+    let res: RedisValue = {
+        let rctx = redis_module::MODULE_CONTEXT.lock();
+        rctx.call(cmdargs[0], &cmdargs[1..])
+            .expect("failed to call redis")
+    };
 
     // Handle more Redis return types
     match res {
