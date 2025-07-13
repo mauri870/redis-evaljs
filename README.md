@@ -2,7 +2,7 @@
 
 This module provides a way to evaluate JavaScript code inside of Redis. It uses the awesome QuickJS engine by Fabrice Bellard.
 
-It is similar in functionality to [EVAL](https://redis.io/commands/eval). Currently there is no support for executing Redis commands, think of it as a JS interpreter inside Redis.
+It is similar in functionality to [EVAL](https://redis.io/commands/eval).
 
 Unfortunately it is not as fast as EVAL, but it is still quite fast:
 
