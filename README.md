@@ -55,6 +55,17 @@ $ redis-cli EVALJS "return redis.call('GET', 'a')" 0
 "42"
 ```
 
+You can also use it to implement more complex logic, such as a [distributed lock](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/):
+
+```bash
+# lock
+$ redis-cli EVALJS "return redis.call('SET', KEYS[0], ARGV[0], 'NX', 'PX', ARGV[1]) ? 1 : 0;" 1 my_lock abc123 30000
+(integer) 1
+# unlock
+$ redis-cli EVALJS "return redis.call('GET', KEYS[0]) === ARGV[0] ? redis.call('DEL', KEYS[0]) : 0;" 1 my_lock abc123
+(integer) 1
+```
+
 ## Installation
 
 You can build the module using cargo:

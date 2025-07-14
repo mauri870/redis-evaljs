@@ -1,3 +1,7 @@
+setup() {
+    redis-cli flushdb
+}
+
 @test "simple expression" {
     run redis-cli EVALJS "return 41 + 1" 0
     [ "$status" -eq 0 ]
@@ -85,4 +89,32 @@ EOF
     run redis-cli EVALJS "return redis.call('GET', 'a')" 0
     [ "$status" -eq 0 ]
     [ "$output" = "42" ]
+}
+
+@test "distributed lock" {
+    # Test acquiring lock
+    run redis-cli EVALJS "return redis.call('SET', KEYS[0], ARGV[0], 'NX', 'PX', ARGV[1]) ? 1 : 0;" 1 my_lock abc123 30000
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+
+    # Test acquiring the same lock again (should fail)
+    run redis-cli EVALJS "return redis.call('SET', KEYS[0], ARGV[0], 'NX', 'PX', ARGV[1]) ? 1 : 0;" 1 my_lock abc123 30000
+    [ "$status" -eq 0 ]
+    [ "$output" = "0" ]
+
+    # Test unlocking with correct token
+    run redis-cli EVALJS "return redis.call('GET', KEYS[0]) === ARGV[0] ? redis.call('DEL', KEYS[0]) : 0;" 1 my_lock abc123
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+
+    # Test unlocking again (should fail since lock is already released)
+    run redis-cli EVALJS "return redis.call('GET', KEYS[0]) === ARGV[0] ? redis.call('DEL', KEYS[0]) : 0;" 1 my_lock abc123
+    [ "$status" -eq 0 ]
+    [ "$output" = "0" ]
+
+    # Test unlocking with wrong token
+    redis-cli EVALJS "return redis.call('SET', KEYS[0], ARGV[0], 'NX', 'PX', ARGV[1]) ? 1 : 0;" 1 my_lock abc123 30000
+    run redis-cli EVALJS "return redis.call('GET', KEYS[0]) === ARGV[0] ? redis.call('DEL', KEYS[0]) : 0;" 1 my_lock wrong_token
+    [ "$status" -eq 0 ]
+    [ "$output" = "0" ]
 }
