@@ -26,7 +26,11 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl ThreadPool {
     fn new(size: usize) -> ThreadPool {
-        let (sender, receiver) = crossbeam_channel::unbounded::<Job>();
+        // Bounded uses crossbeam's array-based flavor (fixed ring buffer), which is
+        // significantly cheaper per send/recv than unbounded's segmented-list flavor.
+        // The capacity is sized well above realistic in-flight request counts so the
+        // queue never actually fills and send() never blocks the Redis main thread.
+        let (sender, receiver) = crossbeam_channel::bounded::<Job>(8192);
 
         for _ in 0..size {
             let receiver = receiver.clone();
@@ -50,8 +54,12 @@ impl ThreadPool {
 }
 
 fn init(_ctx: &Context, _args: &[RedisString]) -> Status {
-    // Initialize thread pool
-    THREAD_POOL.get_or_init(|| ThreadPool::new(num_cpus::get()));
+    // Worker threads busy-spin while idle waiting for jobs (crossbeam_channel's
+    // backoff strategy). Sizing the pool to num_cpus oversubscribes the machine —
+    // idle workers spin-compete with the Redis main thread for cores, which measurably
+    // *hurts* throughput. A quarter of the core count keeps enough parallelism for
+    // concurrent EVALJS calls without starving everything else.
+    THREAD_POOL.get_or_init(|| ThreadPool::new(num_cpus::get().div_ceil(4).max(4)));
 
     Status::Ok
 }
