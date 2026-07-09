@@ -95,17 +95,12 @@ fn evaljs_cmd(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
             if vm_opt.is_none() {
                 *vm_opt = Some(vm::VM::new().expect("failed to initialize QJS VM"));
             }
-            vm_opt.as_ref().unwrap().eval(|ctx| {
+            vm_opt.as_ref().unwrap().with_function(&code, |ctx, func| {
                 let globals = ctx.globals();
                 globals.set("KEYS", &keys).expect("failed to set KEYS");
                 globals.set("ARGV", &argv).expect("failed to set ARGV");
 
-                let mut wrapper = String::with_capacity(code.len() + 30);
-                wrapper.push_str("(function(){");
-                wrapper.push_str(&code);
-                wrapper.push_str("})();");
-
-                match ctx.eval(wrapper) {
+                match func.and_then(|f| f.call(())) {
                     Ok(v) => RedisResult::Ok(Value(v).into()),
                     Err(e) => RedisResult::Err(RedisError::String(e.to_string())),
                 }
