@@ -4,22 +4,22 @@ This module provides a way to evaluate JavaScript code inside of Redis. It uses 
 
 It is similar in functionality to [EVAL](https://redis.io/commands/eval).
 
-Unfortunately it is not as fast as EVAL, but it is still quite fast:
+It's now roughly on par with EVAL, and sometimes faster:
 
 ```bash
 $ valkey-benchmark EVALJS "return 1 + 2" 0
 Summary:
-  throughput summary: 335570.47 requests per second
+  throughput summary: 308641.97 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.127     0.032     0.119     0.239     0.295     0.839
+        0.135     0.032     0.119     0.271     0.319     1.495
 
 $ valkey-benchmark EVAL "return 1 + 2" 0
 Summary:
-  throughput summary: 253807.11 requests per second
+  throughput summary: 287356.34 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.145     0.048     0.143     0.223     0.247     2.415
+        0.121     0.016     0.119     0.215     0.239     0.599
 ```
 
 Here are some examples:
