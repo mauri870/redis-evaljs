@@ -61,6 +61,9 @@ You can also use it to implement more complex logic, such as a [distributed lock
 # lock
 $ valkey-cli EVALJS "return redis.call('SET', KEYS[0], ARGV[0], 'NX', 'PX', ARGV[1]) ? 1 : 0;" 1 my_lock abc123 30000
 (integer) 1
+# try to lock again, fails
+$ valkey-cli EVALJS "return redis.call('GET', KEYS[0]) === ARGV[0] ? redis.call('DEL', KEYS[0]) : 0;" 1 my_lock abc123
+(integer) 0
 # unlock
 $ valkey-cli EVALJS "return redis.call('GET', KEYS[0]) === ARGV[0] ? redis.call('DEL', KEYS[0]) : 0;" 1 my_lock abc123
 (integer) 1
