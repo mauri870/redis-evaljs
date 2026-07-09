@@ -8,11 +8,8 @@ use redis_module::{
     Context, NextArg, RedisError, RedisResult, RedisString, RedisValue, Status, ThreadSafeContext,
 };
 use rquickjs::{Type, Value as QJSValue};
-use std::{
-    cell::RefCell,
-    sync::{mpsc, Arc, Mutex, OnceLock},
-    thread,
-};
+use crossbeam_channel::Sender;
+use std::{cell::RefCell, sync::OnceLock, thread};
 
 static THREAD_POOL: OnceLock<ThreadPool> = OnceLock::new();
 
@@ -22,22 +19,20 @@ thread_local! {
 }
 
 struct ThreadPool {
-    sender: mpsc::Sender<Job>,
+    sender: Sender<Job>,
 }
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl ThreadPool {
     fn new(size: usize) -> ThreadPool {
-        let (sender, receiver) = mpsc::channel::<Job>();
-        let receiver = Arc::new(Mutex::new(receiver));
+        let (sender, receiver) = crossbeam_channel::unbounded::<Job>();
 
         for _ in 0..size {
-            let receiver = Arc::clone(&receiver);
-            thread::spawn(move || loop {
-                match receiver.lock().unwrap().recv() {
-                    Ok(job) => job(),
-                    Err(_) => break,
+            let receiver = receiver.clone();
+            thread::spawn(move || {
+                for job in receiver {
+                    job();
                 }
             });
         }
