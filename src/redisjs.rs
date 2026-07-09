@@ -1,8 +1,9 @@
 use redis_module::RedisValue;
 use rquickjs::{
     prelude::{Func, Rest},
-    Ctx, IntoJs, Object, Result, Value,
+    Ctx, Exception, IntoJs, Object, Result, Type, Value,
 };
+use smallvec::SmallVec;
 
 pub fn init(ctx: &Ctx<'_>) -> Result<()> {
     let globals = ctx.globals();
@@ -16,14 +17,33 @@ pub fn init(ctx: &Ctx<'_>) -> Result<()> {
     Ok(())
 }
 
-fn call<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> Result<Value<'js>> {
-    let strargs: Vec<String> = args
-        .iter()
-        .map(|v| unsafe { v.ref_string() }.to_string().unwrap())
-        .collect();
+// Stringify a redis.call argument the way EVAL/Lua does: strings pass through,
+// numbers and booleans are coerced to their string form. Anything else (e.g.
+// an object) can't be sent to Redis as a command argument.
+fn arg_to_string(v: &Value) -> Result<String> {
+    match v.type_of() {
+        Type::String => Ok(unsafe { v.ref_string() }.to_string()?),
+        Type::Int => Ok(v.as_int().unwrap().to_string()),
+        Type::Float => Ok(v.as_float().unwrap().to_string()),
+        Type::Bool => Ok(if v.as_bool().unwrap() { "1" } else { "0" }.to_string()),
+        other => Err(Exception::throw_type(
+            v.ctx(),
+            &format!("redis.call: unsupported argument type {other:?}"),
+        )),
+    }
+}
 
-    // Create string slice references more efficiently
-    let cmdargs: Vec<&str> = strargs.iter().map(|s| s.as_str()).collect();
+fn call<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> Result<Value<'js>> {
+    let strargs: SmallVec<[String; 8]> = args
+        .iter()
+        .map(arg_to_string)
+        .collect::<Result<_>>()?;
+
+    if strargs.is_empty() {
+        return Err(Exception::throw_type(&ctx, "redis.call: no command given"));
+    }
+
+    let cmdargs: SmallVec<[&str; 8]> = strargs.iter().map(String::as_str).collect();
 
     let res: RedisValue = {
         let rctx = redis_module::MODULE_CONTEXT.lock();
