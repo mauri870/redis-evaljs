@@ -9,17 +9,17 @@ Unfortunately it is not as fast as EVAL, but it is still quite fast:
 ```bash
 $ valkey-benchmark EVALJS "return 1 + 2" 0
 Summary:
-  throughput summary: 44169.61 requests per second
+  throughput summary: 335570.47 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.919     0.240     0.871     1.423     1.671     2.367
+        0.127     0.032     0.119     0.239     0.295     0.839
 
 $ valkey-benchmark EVAL "return 1 + 2" 0
 Summary:
-  throughput summary: 58105.75 requests per second
+  throughput summary: 253807.11 requests per second
   latency summary (msec):
           avg       min       p50       p95       p99       max
-        0.654     0.240     0.591     1.127     1.343     2.023
+        0.145     0.048     0.143     0.223     0.247     2.415
 ```
 
 Here are some examples:
