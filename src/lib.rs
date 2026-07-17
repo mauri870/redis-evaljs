@@ -121,7 +121,7 @@ impl From<Value<'_>> for RedisValue {
             Type::Bool => RedisValue::Bool(v.as_bool().unwrap()),
             Type::Int => RedisValue::Integer(v.as_int().unwrap() as i64),
             Type::Float => RedisValue::Float(v.as_float().unwrap()),
-            Type::String => RedisValue::BulkString(unsafe { v.ref_string() }.to_string().unwrap()),
+            Type::String => RedisValue::BulkString(v.as_string().unwrap().to_string().unwrap()),
             Type::Null | Type::Uninitialized | Type::Undefined | Type::Unknown => RedisValue::Null,
             Type::Array => {
                 let arr = v
