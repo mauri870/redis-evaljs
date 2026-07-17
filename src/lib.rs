@@ -146,6 +146,6 @@ redis_module! {
     data_types: [],
     init: init,
     commands: [
-        ["EVALJS", evaljs_cmd, "", 0, 0, 0],
+        ["EVALJS", evaljs_cmd, "", 0, 0, 0, ""],
     ],
 }
